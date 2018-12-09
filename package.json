@@ -6,7 +6,8 @@
   "scripts": {
     "day1": "cd day1 && ts-node index",
     "day2": "cd day2 && ts-node index",
-    "day3": "cd day3 && ts-node index"
+    "day3": "cd day3 && ts-node index",
+    "day4": "cd day4 && ts-node index"
   },
   "author": "",
   "license": "ISC",
