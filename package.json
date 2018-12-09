@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "day1": "cd day1 && ts-node index",
-    "day2-part1": "cd day2 && ts-node part1",
-    "day2-part2": "cd day2 && ts-node part2",
+    "day2": "cd day2 && ts-node index",
     "day3": "cd day3 && ts-node index"
   },
   "author": "",
