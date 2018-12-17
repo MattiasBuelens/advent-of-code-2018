@@ -9,7 +9,7 @@
     "day3": "cd day3 && ts-node index",
     "day4": "cd day4 && ts-node index",
     "day5": "cd day5 && ts-node index",
-    "day6": "cd day5 && ts-node index"
+    "day6": "cd day6 && ts-node index"
   },
   "author": "",
   "license": "ISC",
