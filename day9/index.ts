@@ -9,37 +9,50 @@ const readFile = promisify(fs.readFile);
     const [nbPlayers, lastMarble] = groups.map(x => parseInt(x, 10));
 
     part1(nbPlayers, lastMarble);
+    part2(nbPlayers, lastMarble);
 })();
+
+interface Marble {
+    value: number;
+    prev: Marble;
+    next: Marble;
+}
 
 function part1(nbPlayers: number, lastMarble: number) {
     const score = solve(nbPlayers, lastMarble);
     console.log(`Answer to part 1: ${score}`);
 }
 
+function part2(nbPlayers: number, lastMarble: number) {
+    const score = solve(nbPlayers, lastMarble * 100);
+    console.log(`Answer to part 2: ${score}`);
+}
+
 function solve(nbPlayers: number, lastMarble: number): number {
     const scores = new Array<number>(nbPlayers).fill(0);
-    let marbles = [0];
-    let currentMarbleIndex = 0;
+
+    let currentMarble: Marble = {value: 0, prev: undefined!, next: undefined!};
+    currentMarble.prev = currentMarble.next = currentMarble;
+
     let currentPlayer = 0;
-    for (let newMarble = 1; newMarble <= lastMarble; newMarble++) {
-        if (newMarble % 23 === 0) {
-            currentMarbleIndex = modulo(currentMarbleIndex - 7, marbles.length);
-            const removedMarble = marbles.splice(currentMarbleIndex, 1)[0]!;
-            scores[currentPlayer] += newMarble + removedMarble;
+    for (let newValue = 1; newValue <= lastMarble; newValue++) {
+        if (newValue % 23 === 0) {
+            for (let i = 1; i < 7; i++) {
+                currentMarble = currentMarble.prev;
+            }
+            const removedMarble = currentMarble.prev;
+            removedMarble.prev.next = currentMarble;
+            currentMarble.prev = removedMarble.prev;
+            scores[currentPlayer] += newValue + removedMarble.value;
         } else {
-            currentMarbleIndex = modulo(currentMarbleIndex + 2, marbles.length);
-            marbles.splice(currentMarbleIndex, 0, newMarble);
+            const prev = currentMarble.next;
+            const next = currentMarble.next.next;
+            currentMarble = {value: newValue, prev, next};
+            prev.next = currentMarble;
+            next.prev = currentMarble;
         }
         currentPlayer = (currentPlayer + 1) % nbPlayers;
     }
 
     return Math.max(...scores);
-}
-
-function modulo(a: number, b: number): number {
-    let ret = a % b;
-    if (ret < 0) {
-        ret += b;
-    }
-    return ret;
 }
