@@ -172,8 +172,9 @@ function part2(originalDungeon: Dungeon) {
             unit.power = power;
         }
 
+        // Keep going as long as all elves are alive
         rounds = 0;
-        while (true) {
+        while (getUnits(dungeon).filter(isElf).length === nbElves) {
             // Start new round
             const result = doRound(dungeon);
             if (result === RoundResult.END_OF_COMBAT) {
