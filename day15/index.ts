@@ -148,6 +148,7 @@ function part1(dungeon: Dungeon) {
 
     console.log(`After ${rounds} complete rounds:`);
     printDungeon(dungeon);
+    console.log();
 
     // You need to determine the outcome of the battle: the number of full rounds that were completed
     // (not counting the round in which combat ends) multiplied by the sum of the hit points of
@@ -201,11 +202,9 @@ function part2(originalDungeon: Dungeon) {
         dungeon = cloneDungeon(originalDungeon);
     }
 
-    if (DEBUG) {
-        console.log(`After ${rounds} complete rounds with power ${power}:`);
-        printDungeon(dungeon);
-        console.log();
-    }
+    console.log(`After ${rounds} complete rounds with power ${power}:`);
+    printDungeon(dungeon);
+    console.log();
 
     // You need to determine the outcome of the battle: the number of full rounds that were completed
     // (not counting the round in which combat ends) multiplied by the sum of the hit points of
