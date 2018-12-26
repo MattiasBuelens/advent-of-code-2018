@@ -6,7 +6,6 @@ const DEBUG = true;
 const readFile = promisify(fs.readFile);
 
 interface Dungeon {
-    units: Unit[];
     unitMap: Map<number, Map<number, Unit>>;
     wallMap: Map<number, Set<number>>;
     width: number;
@@ -26,10 +25,11 @@ interface Position {
 interface Unit extends Position {
     type: UnitType;
     hp: number;
+    power: number;
 }
 
-const INITIAL_HP = 200;
-const ATTACK_POWER = 3;
+const DEFAULT_HP = 200;
+const DEFAULT_POWER = 3;
 
 (async () => {
     const input = await readFile('./input', {encoding: 'utf8'});
@@ -40,11 +40,11 @@ const ATTACK_POWER = 3;
         console.log('Initial state:');
         printDungeon(dungeon);
     }
-    part1(dungeon);
+    part1(cloneDungeon(dungeon));
+    part2(cloneDungeon(dungeon));
 })();
 
 function parseDungeon(lines: string[]): Dungeon {
-    const units: Unit[] = [];
     const unitMap = new Map<number, Map<number, Unit>>();
     const wallMap = new Map<number, Set<number>>();
     const height = lines.length;
@@ -67,21 +67,19 @@ function parseDungeon(lines: string[]): Dungeon {
                     break;
                 }
                 case 'G': {
-                    const goblin = {x, y, type: UnitType.GOBLIN, hp: INITIAL_HP};
-                    units.push(goblin);
+                    const goblin = {x, y, type: UnitType.GOBLIN, hp: DEFAULT_HP, power: DEFAULT_POWER};
                     unitMap.get(y)!.set(x, goblin);
                     break;
                 }
                 case 'E': {
-                    const elf = {x, y, type: UnitType.ELF, hp: INITIAL_HP};
-                    units.push(elf);
+                    const elf = {x, y, type: UnitType.ELF, hp: DEFAULT_HP, power: DEFAULT_POWER};
                     unitMap.get(y)!.set(x, elf);
                     break;
                 }
             }
         }
     }
-    return {units, unitMap, wallMap, width, height};
+    return {unitMap, wallMap, width, height};
 }
 
 function printDungeon(dungeon: Dungeon) {
@@ -111,6 +109,27 @@ function printDungeon(dungeon: Dungeon) {
     }
 }
 
+function cloneDungeon(dungeon: Dungeon): Dungeon {
+    const {width, height} = dungeon;
+    const unitMap = new Map<number, Map<number, Unit>>();
+    const wallMap = new Map<number, Set<number>>();
+    for (let y = 0; y < height; y++) {
+        const unitRow = new Map<number, Unit>();
+        unitMap.set(y, unitRow);
+        for (let [x, unit] of dungeon.unitMap.get(y)!.entries()) {
+            unitRow.set(x, {
+                x: unit.x,
+                y: unit.y,
+                type: unit.type,
+                hp: unit.hp,
+                power: unit.power
+            });
+        }
+        wallMap.set(y, new Set<number>([...dungeon.wallMap.get(y)!]));
+    }
+    return {unitMap, wallMap, width, height};
+}
+
 function part1(dungeon: Dungeon) {
     let rounds = 0;
     while (true) {
@@ -134,8 +153,65 @@ function part1(dungeon: Dungeon) {
     // (not counting the round in which combat ends) multiplied by the sum of the hit points of
     // all remaining units at the moment combat ends.
     // (Combat only ends when a unit finds no targets during its turn.)
-    const outcome = rounds * dungeon.units.reduce((sum, unit) => sum + unit.hp, 0);
+    const outcome = rounds * getUnits(dungeon).reduce((sum, unit) => sum + unit.hp, 0);
     console.log(`Answer to part 1: ${outcome}`);
+}
+
+function part2(originalDungeon: Dungeon) {
+    const nbElves = getUnits(originalDungeon).filter(isElf).length;
+
+    let power = DEFAULT_POWER;
+    let rounds = 0;
+    let dungeon = cloneDungeon(originalDungeon);
+    while (true) {
+        // Create dungeon with stronger elves
+        if (DEBUG) {
+            console.log(`Power: ${power}`);
+        }
+        for (const unit of getUnits(dungeon).filter(isElf)) {
+            unit.power = power;
+        }
+
+        rounds = 0;
+        while (true) {
+            // Start new round
+            const result = doRound(dungeon);
+            if (result === RoundResult.END_OF_COMBAT) {
+                break;
+            }
+            // If all units have taken turns in this round, the round ends, and a new round begins.
+            rounds++;
+        }
+
+        if (DEBUG) {
+            console.log(`After ${rounds} complete rounds:`);
+            printDungeon(dungeon);
+            console.log();
+        }
+
+        const aliveUnits = getUnits(dungeon);
+        if (aliveUnits.every(isElf) && aliveUnits.length === nbElves) {
+            // Elves win!
+            break;
+        }
+
+        // Increase power and reset dungeon for next iteration
+        power++;
+        dungeon = cloneDungeon(originalDungeon);
+    }
+
+    if (DEBUG) {
+        console.log(`After ${rounds} complete rounds with power ${power}:`);
+        printDungeon(dungeon);
+        console.log();
+    }
+
+    // You need to determine the outcome of the battle: the number of full rounds that were completed
+    // (not counting the round in which combat ends) multiplied by the sum of the hit points of
+    // all remaining units at the moment combat ends.
+    // (Combat only ends when a unit finds no targets during its turn.)
+    const outcome = rounds * getUnits(dungeon).reduce((sum, unit) => sum + unit.hp, 0);
+    console.log(`Answer to part 2: ${outcome}`);
 }
 
 const enum RoundResult {
@@ -144,12 +220,12 @@ const enum RoundResult {
 }
 
 function doRound(dungeon: Dungeon) {
-    const turnOrder = dungeon.units.slice().sort(compareByPosition);
+    const turnOrder = getUnits(dungeon).sort(compareByPosition);
     for (let u = 0; u < turnOrder.length; u++) {
         const attacker = turnOrder[u];
 
         // Each unit begins its turn by identifying all possible targets (enemy units).
-        const targets = dungeon.units.filter(unit => isTarget(attacker, unit));
+        const targets = turnOrder.filter(unit => isTarget(attacker, unit));
         // If no targets remain, combat ends.
         if (targets.length === 0) {
             return RoundResult.END_OF_COMBAT;
@@ -176,20 +252,25 @@ function doRound(dungeon: Dungeon) {
             // and determines which of those squares it could reach in the fewest steps.
             // If multiple squares are in range and tied for being reachable in the fewest steps,
             // the square which is first in reading order is chosen.
-            let paths = findOptimalPaths(dungeon, attacker);
-            let pathsToOpenSquares = openSquaresInRange
-                .map(square => paths.get(square.y)!.get(square.x)!)
+            let pathsFromAttacker = findPaths(dungeon, attacker);
+            let closestOpenSquares = openSquaresInRange
+                .map(square => pathsFromAttacker.get(square.y)!.get(square.x)!)
                 .filter(path => path.cost < Infinity);
             // If the unit cannot reach (find an open path to) any of the squares that are in range,
             // it ends its turn.
-            if (!pathsToOpenSquares.length) {
+            if (!closestOpenSquares.length) {
                 continue;
             }
             // The unit then takes a single step toward the chosen square along the shortest path to that square.
             // If multiple steps would put the unit equally closer to its destination,
             // the unit chooses the step which is first in reading order.
-            let bestPathToOpenSquare = minBy(pathsToOpenSquares, compareByCost);
-            let nextPosition = constructPath(bestPathToOpenSquare)[1];
+            let closestOpenSquare = minBy(closestOpenSquares, compareByCost);
+            let pathsToOpenSquare = findPaths(dungeon, closestOpenSquare);
+            let neighbours = getAdjacentPositions(attacker);
+            let neighbourPaths = neighbours
+                .map(neighbour => pathsToOpenSquare.get(neighbour.y)!.get(neighbour.x)!)
+                .filter(path => path.cost < Infinity);
+            let nextPosition = minBy(neighbourPaths, compareByCost);
             // Move attacker to next position
             if (DEBUG) {
                 console.assert(isAdjacent(attacker, nextPosition));
@@ -213,12 +294,11 @@ function doRound(dungeon: Dungeon) {
         const weakestTarget = minBy(targetsInRange, compareByHP);
         // The unit deals damage equal to its attack power to the selected target,
         // reducing its hit points by that amount.
-        weakestTarget.hp -= ATTACK_POWER;
+        weakestTarget.hp -= attacker.power;
         // If this reduces its hit points to 0 or fewer, the selected target dies:
         // its square becomes `.` and it takes no further turns.
         if (weakestTarget.hp <= 0) {
             // Remove from dungeon
-            dungeon.units.splice(dungeon.units.indexOf(weakestTarget), 1);
             dungeon.unitMap.get(weakestTarget.y)!.delete(weakestTarget.x);
             // Remove from turn order
             let weakestTargetOrder = turnOrder.indexOf(weakestTarget);
@@ -252,9 +332,17 @@ function isTarget(attacker: Unit, unit: Unit): boolean {
     return unit.type !== attacker.type;
 }
 
+function isElf(unit: Unit): boolean {
+    return unit.type === UnitType.ELF;
+}
+
 function isAdjacent(left: Position, right: Position): boolean {
     return (left.x === right.x && Math.abs(left.y - right.y) === 1)
         || (left.y === right.y && Math.abs(left.x - right.x) === 1);
+}
+
+function getUnits(dungeon: Dungeon): Unit[] {
+    return flatMap([...dungeon.unitMap.values()], (row) => [...row.values()]);
 }
 
 function getAdjacentPositions({x, y}: Position): Position[] {
@@ -293,7 +381,7 @@ interface Node extends Position {
 
 type NodeMap = Map<number, Map<number, Node>>;
 
-function findOptimalPaths(dungeon: Dungeon, start: Position): NodeMap {
+function findPaths(dungeon: Dungeon, start: Position): NodeMap {
     // https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Algorithm
     // 1. Mark all nodes unvisited.
     //    Create a set of all the unvisited nodes called the unvisited set.
@@ -331,8 +419,7 @@ function findOptimalPaths(dungeon: Dungeon, start: Position): NodeMap {
                 continue;
             }
             let costThroughCurrent = current.cost + 1;
-            if (costThroughCurrent < neighbour.cost
-                || (costThroughCurrent === neighbour.cost && compareByPosition(current, neighbour.prev!) <= 0)) {
+            if (costThroughCurrent < neighbour.cost) {
                 // Found better path through current
                 let oldIndex = binarySearch(unvisited, neighbour, compareByCost);
                 if (DEBUG) {
@@ -358,6 +445,25 @@ function findOptimalPaths(dungeon: Dungeon, start: Position): NodeMap {
     return nodes;
 }
 
+function printPaths(dungeon: Dungeon, nodes: NodeMap) {
+    for (let y = 0; y < dungeon.height; y++) {
+        let line: string[] = [];
+        for (let x = 0; x < dungeon.width; x++) {
+            const node = nodes.get(y)!.get(x)!;
+            if (node.cost === 0) {
+                line.push('0');
+            } else if (!node.prev) {
+                line.push('#');
+            } else if (y === node.prev.y) {
+                line.push(x < node.prev.x ? '>' : '<');
+            } else if (x === node.prev.x) {
+                line.push(y < node.prev.y ? 'v' : '^');
+            }
+        }
+        console.log(line.join(''));
+    }
+}
+
 function compareByCost(left: Node, right: Node): number {
     return (left.cost - right.cost) || compareByPosition(left, right);
 }
@@ -377,14 +483,4 @@ function binarySearch<T>(array: T[], key: T, compare: (left: T, right: T) => num
         }
     }
     return -(low + 1);  // key not found
-}
-
-function constructPath(node: Node): Position[] {
-    let path = [];
-    path.push(node);
-    while (node.prev) {
-        path.push(node.prev);
-        node = node.prev;
-    }
-    return path.reverse();
 }
