@@ -143,95 +143,95 @@ const enum RoundResult {
     END_OF_COMBAT
 }
 
-    function doRound(dungeon: Dungeon) {
-        const turnOrder = dungeon.units.slice().sort(compareByPosition);
-        for (let u = 0; u < turnOrder.length; u++) {
-            const attacker = turnOrder[u];
+function doRound(dungeon: Dungeon) {
+    const turnOrder = dungeon.units.slice().sort(compareByPosition);
+    for (let u = 0; u < turnOrder.length; u++) {
+        const attacker = turnOrder[u];
 
-            // Each unit begins its turn by identifying all possible targets (enemy units).
-            const targets = dungeon.units.filter(unit => isTarget(attacker, unit));
-            // If no targets remain, combat ends.
-            if (targets.length === 0) {
-                return RoundResult.END_OF_COMBAT;
-            }
-
-            // Then, the unit identifies all of the open squares (.) that are in range of each target;
-            // these are the squares which are adjacent (immediately up, down, left, or right)
-            // to any target and which aren't already occupied by a wall or another unit.
-            let openSquaresInRange = flatMap(targets, getAdjacentPositions)
-                .filter(pos => !isOccupied(dungeon, pos))
-                .sort(compareByPosition).filter(dedupeByPosition);
-            // Alternatively, the unit might already be in range of a target.
-            let targetsInRange = targets.filter(target => isAdjacent(attacker, target));
-            // If the unit is not already in range of a target,
-            // and there are no open squares which are in range of a target,
-            // the unit ends its turn.
-            if (targetsInRange.length === 0 && openSquaresInRange.length === 0) {
-                continue;
-            }
-            // If the unit is already in range of a target, it does not move, but continues its turn with an attack.
-            // Otherwise, since it is not in range of a target, it moves.
-            if (targetsInRange.length === 0) {
-                // To move, the unit first considers the squares that are in range
-                // and determines which of those squares it could reach in the fewest steps.
-                // If multiple squares are in range and tied for being reachable in the fewest steps,
-                // the square which is first in reading order is chosen.
-                let paths = findOptimalPaths(dungeon, attacker);
-                let pathsToOpenSquares = openSquaresInRange
-                    .map(square => paths.get(square.y)!.get(square.x)!)
-                    .filter(path => path.cost < Infinity);
-                // If the unit cannot reach (find an open path to) any of the squares that are in range,
-                // it ends its turn.
-                if (!pathsToOpenSquares.length) {
-                    continue;
-                }
-                // The unit then takes a single step toward the chosen square along the shortest path to that square.
-                // If multiple steps would put the unit equally closer to its destination,
-                // the unit chooses the step which is first in reading order.
-                let bestPathToOpenSquare = minBy(pathsToOpenSquares, compareByCost);
-                let nextPosition = constructPath(bestPathToOpenSquare)[1];
-                // Move attacker to next position
-                if (DEBUG) {
-                    console.assert(isAdjacent(attacker, nextPosition));
-                }
-                dungeon.unitMap.get(attacker.y)!.delete(attacker.x);
-                attacker.x = nextPosition.x;
-                attacker.y = nextPosition.y;
-                dungeon.unitMap.get(attacker.y)!.set(attacker.x, attacker);
-            }
-
-            // After moving (or if the unit began its turn in range of a target), the unit attacks.
-            // To attack, the unit first determines all of the targets that are in range of it
-            // by being immediately adjacent to it.
-            targetsInRange = targets.filter(target => isAdjacent(attacker, target));
-            // If there are no such targets, the unit ends its turn.
-            if (targetsInRange.length === 0) {
-                continue;
-            }
-            // Otherwise, the adjacent target with the fewest hit points is selected;
-            // in a tie, the adjacent target with the fewest hit points which is first in reading order is selected.
-            const weakestTarget = minBy(targetsInRange, compareByHP);
-            // The unit deals damage equal to its attack power to the selected target,
-            // reducing its hit points by that amount.
-            weakestTarget.hp -= ATTACK_POWER;
-            // If this reduces its hit points to 0 or fewer, the selected target dies:
-            // its square becomes `.` and it takes no further turns.
-            if (weakestTarget.hp <= 0) {
-                // Remove from dungeon
-                dungeon.units.splice(dungeon.units.indexOf(weakestTarget), 1);
-                dungeon.unitMap.get(weakestTarget.y)!.delete(weakestTarget.x);
-                // Remove from turn order
-                let weakestTargetOrder = turnOrder.indexOf(weakestTarget);
-                turnOrder.splice(weakestTargetOrder, 1);
-                if (u >= weakestTargetOrder) {
-                    u--;
-                }
-            }
-            // After attacking, the unit's turn ends.
+        // Each unit begins its turn by identifying all possible targets (enemy units).
+        const targets = dungeon.units.filter(unit => isTarget(attacker, unit));
+        // If no targets remain, combat ends.
+        if (targets.length === 0) {
+            return RoundResult.END_OF_COMBAT;
         }
-        // If all units have taken turns in this round, the round ends, and a new round begins.
-        return RoundResult.CONTINUE;
+
+        // Then, the unit identifies all of the open squares (.) that are in range of each target;
+        // these are the squares which are adjacent (immediately up, down, left, or right)
+        // to any target and which aren't already occupied by a wall or another unit.
+        let openSquaresInRange = flatMap(targets, getAdjacentPositions)
+            .filter(pos => !isOccupied(dungeon, pos))
+            .sort(compareByPosition).filter(dedupeByPosition);
+        // Alternatively, the unit might already be in range of a target.
+        let targetsInRange = targets.filter(target => isAdjacent(attacker, target));
+        // If the unit is not already in range of a target,
+        // and there are no open squares which are in range of a target,
+        // the unit ends its turn.
+        if (targetsInRange.length === 0 && openSquaresInRange.length === 0) {
+            continue;
+        }
+        // If the unit is already in range of a target, it does not move, but continues its turn with an attack.
+        // Otherwise, since it is not in range of a target, it moves.
+        if (targetsInRange.length === 0) {
+            // To move, the unit first considers the squares that are in range
+            // and determines which of those squares it could reach in the fewest steps.
+            // If multiple squares are in range and tied for being reachable in the fewest steps,
+            // the square which is first in reading order is chosen.
+            let paths = findOptimalPaths(dungeon, attacker);
+            let pathsToOpenSquares = openSquaresInRange
+                .map(square => paths.get(square.y)!.get(square.x)!)
+                .filter(path => path.cost < Infinity);
+            // If the unit cannot reach (find an open path to) any of the squares that are in range,
+            // it ends its turn.
+            if (!pathsToOpenSquares.length) {
+                continue;
+            }
+            // The unit then takes a single step toward the chosen square along the shortest path to that square.
+            // If multiple steps would put the unit equally closer to its destination,
+            // the unit chooses the step which is first in reading order.
+            let bestPathToOpenSquare = minBy(pathsToOpenSquares, compareByCost);
+            let nextPosition = constructPath(bestPathToOpenSquare)[1];
+            // Move attacker to next position
+            if (DEBUG) {
+                console.assert(isAdjacent(attacker, nextPosition));
+            }
+            dungeon.unitMap.get(attacker.y)!.delete(attacker.x);
+            attacker.x = nextPosition.x;
+            attacker.y = nextPosition.y;
+            dungeon.unitMap.get(attacker.y)!.set(attacker.x, attacker);
+        }
+
+        // After moving (or if the unit began its turn in range of a target), the unit attacks.
+        // To attack, the unit first determines all of the targets that are in range of it
+        // by being immediately adjacent to it.
+        targetsInRange = targets.filter(target => isAdjacent(attacker, target));
+        // If there are no such targets, the unit ends its turn.
+        if (targetsInRange.length === 0) {
+            continue;
+        }
+        // Otherwise, the adjacent target with the fewest hit points is selected;
+        // in a tie, the adjacent target with the fewest hit points which is first in reading order is selected.
+        const weakestTarget = minBy(targetsInRange, compareByHP);
+        // The unit deals damage equal to its attack power to the selected target,
+        // reducing its hit points by that amount.
+        weakestTarget.hp -= ATTACK_POWER;
+        // If this reduces its hit points to 0 or fewer, the selected target dies:
+        // its square becomes `.` and it takes no further turns.
+        if (weakestTarget.hp <= 0) {
+            // Remove from dungeon
+            dungeon.units.splice(dungeon.units.indexOf(weakestTarget), 1);
+            dungeon.unitMap.get(weakestTarget.y)!.delete(weakestTarget.x);
+            // Remove from turn order
+            let weakestTargetOrder = turnOrder.indexOf(weakestTarget);
+            turnOrder.splice(weakestTargetOrder, 1);
+            if (u >= weakestTargetOrder) {
+                u--;
+            }
+        }
+        // After attacking, the unit's turn ends.
     }
+    // If all units have taken turns in this round, the round ends, and a new round begins.
+    return RoundResult.CONTINUE;
+}
 
 function compareByPosition(left: Position, right: Position): number {
     return (left.y - right.y) || (left.x - right.x);
