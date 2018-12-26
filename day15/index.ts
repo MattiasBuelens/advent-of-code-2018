@@ -113,8 +113,37 @@ function printDungeon(dungeon: Dungeon) {
 
 function part1(dungeon: Dungeon) {
     let rounds = 0;
-    roundLoop: while (true) {
+    while (true) {
         // Start new round
+        const result = doRound(dungeon);
+        if (result === RoundResult.END_OF_COMBAT) {
+            break;
+        }
+        // If all units have taken turns in this round, the round ends, and a new round begins.
+        rounds++;
+        if (DEBUG) {
+            console.log(`After round #${rounds}:`);
+            printDungeon(dungeon);
+        }
+    }
+
+    console.log(`After ${rounds} complete rounds:`);
+    printDungeon(dungeon);
+
+    // You need to determine the outcome of the battle: the number of full rounds that were completed
+    // (not counting the round in which combat ends) multiplied by the sum of the hit points of
+    // all remaining units at the moment combat ends.
+    // (Combat only ends when a unit finds no targets during its turn.)
+    const outcome = rounds * dungeon.units.reduce((sum, unit) => sum + unit.hp, 0);
+    console.log(`Answer to part 1: ${outcome}`);
+}
+
+const enum RoundResult {
+    CONTINUE,
+    END_OF_COMBAT
+}
+
+    function doRound(dungeon: Dungeon) {
         const turnOrder = dungeon.units.slice().sort(compareByPosition);
         for (let u = 0; u < turnOrder.length; u++) {
             const attacker = turnOrder[u];
@@ -123,7 +152,7 @@ function part1(dungeon: Dungeon) {
             const targets = dungeon.units.filter(unit => isTarget(attacker, unit));
             // If no targets remain, combat ends.
             if (targets.length === 0) {
-                break roundLoop;
+                return RoundResult.END_OF_COMBAT;
             }
 
             // Then, the unit identifies all of the open squares (.) that are in range of each target;
@@ -201,23 +230,8 @@ function part1(dungeon: Dungeon) {
             // After attacking, the unit's turn ends.
         }
         // If all units have taken turns in this round, the round ends, and a new round begins.
-        rounds++;
-        if (DEBUG) {
-            console.log(`After round #${rounds}:`);
-            printDungeon(dungeon);
-        }
+        return RoundResult.CONTINUE;
     }
-
-    console.log(`After ${rounds} complete rounds:`);
-    printDungeon(dungeon);
-
-    // You need to determine the outcome of the battle: the number of full rounds that were completed
-    // (not counting the round in which combat ends) multiplied by the sum of the hit points of
-    // all remaining units at the moment combat ends.
-    // (Combat only ends when a unit finds no targets during its turn.)
-    const outcome = rounds * dungeon.units.reduce((sum, unit) => sum + unit.hp, 0);
-    console.log(`Answer to part 1: ${outcome}`);
-}
 
 function compareByPosition(left: Position, right: Position): number {
     return (left.y - right.y) || (left.x - right.x);
