@@ -6,8 +6,8 @@ const DEBUG = true;
 const readFile = promisify(fs.readFile);
 
 interface Dungeon {
-    unitMap: Map<number, Map<number, Unit>>;
-    wallMap: Map<number, Set<number>>;
+    units: Map<number, Map<number, Unit>>;
+    walls: Map<number, Set<number>>;
     width: number;
     height: number;
 }
@@ -45,8 +45,8 @@ const DEFAULT_POWER = 3;
 })();
 
 function parseDungeon(lines: string[]): Dungeon {
-    const unitMap = new Map<number, Map<number, Unit>>();
-    const wallMap = new Map<number, Set<number>>();
+    const units = new Map<number, Map<number, Unit>>();
+    const walls = new Map<number, Set<number>>();
     const height = lines.length;
     const width = lines[0].length;
 
@@ -54,8 +54,8 @@ function parseDungeon(lines: string[]): Dungeon {
         const line = lines[y];
         const unitRow = new Map<number, Unit>();
         const wallRow = new Set<number>();
-        unitMap.set(y, unitRow);
-        wallMap.set(y, wallRow);
+        units.set(y, unitRow);
+        walls.set(y, wallRow);
         for (let x = 0; x < line.length; x++) {
             switch (line[x]) {
                 case '#': {
@@ -68,22 +68,22 @@ function parseDungeon(lines: string[]): Dungeon {
                 }
                 case 'G': {
                     const goblin = {x, y, type: UnitType.GOBLIN, hp: DEFAULT_HP, power: DEFAULT_POWER};
-                    unitMap.get(y)!.set(x, goblin);
+                    units.get(y)!.set(x, goblin);
                     break;
                 }
                 case 'E': {
                     const elf = {x, y, type: UnitType.ELF, hp: DEFAULT_HP, power: DEFAULT_POWER};
-                    unitMap.get(y)!.set(x, elf);
+                    units.get(y)!.set(x, elf);
                     break;
                 }
             }
         }
     }
-    return {unitMap, wallMap, width, height};
+    return {units, walls, width, height};
 }
 
 function printDungeon(dungeon: Dungeon) {
-    const {unitMap, wallMap, width, height} = dungeon;
+    const {units, walls, width, height} = dungeon;
 
     let firstLine: string[] = [];
     firstLine.push(' '.repeat('99: '.length));
@@ -96,10 +96,10 @@ function printDungeon(dungeon: Dungeon) {
         let line: string[] = [];
         line.push(y.toString(10).padStart(2, ' ') + ': ');
         for (let x = 0; x < width; x++) {
-            if (wallMap.get(y)!.has(x)) {
+            if (walls.get(y)!.has(x)) {
                 line.push('#');
-            } else if (unitMap.get(y)!.has(x)) {
-                const unit = unitMap.get(y)!.get(x)!;
+            } else if (units.get(y)!.has(x)) {
+                const unit = units.get(y)!.get(x)!;
                 line.push(unit.type === UnitType.GOBLIN ? 'G' : 'E');
             } else {
                 line.push('.');
@@ -111,12 +111,12 @@ function printDungeon(dungeon: Dungeon) {
 
 function cloneDungeon(dungeon: Dungeon): Dungeon {
     const {width, height} = dungeon;
-    const unitMap = new Map<number, Map<number, Unit>>();
-    const wallMap = new Map<number, Set<number>>();
+    const units = new Map<number, Map<number, Unit>>();
+    const walls = new Map<number, Set<number>>();
     for (let y = 0; y < height; y++) {
         const unitRow = new Map<number, Unit>();
-        unitMap.set(y, unitRow);
-        for (let [x, unit] of dungeon.unitMap.get(y)!.entries()) {
+        units.set(y, unitRow);
+        for (let [x, unit] of dungeon.units.get(y)!.entries()) {
             unitRow.set(x, {
                 x: unit.x,
                 y: unit.y,
@@ -125,9 +125,9 @@ function cloneDungeon(dungeon: Dungeon): Dungeon {
                 power: unit.power
             });
         }
-        wallMap.set(y, new Set<number>([...dungeon.wallMap.get(y)!]));
+        walls.set(y, new Set<number>([...dungeon.walls.get(y)!]));
     }
-    return {unitMap, wallMap, width, height};
+    return {units, walls, width, height};
 }
 
 function part1(dungeon: Dungeon) {
@@ -275,10 +275,10 @@ function doRound(dungeon: Dungeon) {
             if (DEBUG) {
                 console.assert(isAdjacent(attacker, nextPosition));
             }
-            dungeon.unitMap.get(attacker.y)!.delete(attacker.x);
+            dungeon.units.get(attacker.y)!.delete(attacker.x);
             attacker.x = nextPosition.x;
             attacker.y = nextPosition.y;
-            dungeon.unitMap.get(attacker.y)!.set(attacker.x, attacker);
+            dungeon.units.get(attacker.y)!.set(attacker.x, attacker);
         }
 
         // After moving (or if the unit began its turn in range of a target), the unit attacks.
@@ -299,7 +299,7 @@ function doRound(dungeon: Dungeon) {
         // its square becomes `.` and it takes no further turns.
         if (weakestTarget.hp <= 0) {
             // Remove from dungeon
-            dungeon.unitMap.get(weakestTarget.y)!.delete(weakestTarget.x);
+            dungeon.units.get(weakestTarget.y)!.delete(weakestTarget.x);
             // Remove from turn order
             let weakestTargetOrder = turnOrder.indexOf(weakestTarget);
             turnOrder.splice(weakestTargetOrder, 1);
@@ -342,7 +342,7 @@ function isAdjacent(left: Position, right: Position): boolean {
 }
 
 function getUnits(dungeon: Dungeon): Unit[] {
-    return flatMap([...dungeon.unitMap.values()], (row) => [...row.values()]);
+    return flatMap([...dungeon.units.values()], (row) => [...row.values()]);
 }
 
 function getAdjacentPositions({x, y}: Position): Position[] {
@@ -355,8 +355,8 @@ function getAdjacentPositions({x, y}: Position): Position[] {
 }
 
 function isOccupied(dungeon: Dungeon, {x, y}: Position): boolean {
-    return dungeon.unitMap.get(y)!.has(x)
-        || dungeon.wallMap.get(y)!.has(x);
+    return dungeon.units.get(y)!.has(x)
+        || dungeon.walls.get(y)!.has(x);
 }
 
 function minBy<T>(array: T[], compare: (left: T, right: T) => number): T {
