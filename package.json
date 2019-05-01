@@ -21,7 +21,8 @@
     "day15": "cd day15 && ts-node index",
     "day16": "cd day16 && ts-node index",
     "day17": "",
-    "day18": "cd day18 && ts-node index"
+    "day18": "cd day18 && ts-node index",
+    "day19": "cd day19 && ts-node index"
   },
   "author": "",
   "license": "ISC",
