@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as assert from 'assert';
 import {promisify} from 'util';
 
 const DEBUG = true;
@@ -50,6 +51,9 @@ interface Program {
 
     const answer1 = part1(program);
     console.log(`Answer to part 1: ${answer1}`);
+
+    const answer2 = part2(program);
+    console.log(`Answer to part 2: ${answer2}`);
 })();
 
 function parse(lines: string[]): Program {
@@ -160,19 +164,108 @@ function evaluateInstruction(registers: Readonly<RegisterState>, {op, a, b, c}: 
     return newRegisters;
 }
 
+/*
+
+The first few instructions are:
+```
+addi 3 16 3
+seti 1 3 4
+seti 1 8 5
+mulr 4 5 1
+eqrr 1 2 1
+addr 1 3 3
+addi 3 1 3
+addr 4 0 0
+addi 5 1 5
+gtrr 5 2 1
+addr 3 1 3
+seti 2 6 3
+```
+
+This decompiles to:
+```
+00: IP = IP + 16;   // jump to 0+16+1=17 (skip the loop if R3 starts at 0)
+01: r4 = r1 + 3;    // r4 = 0 + 3 = 3
+02: r5 = r1 + 8;    // r5 = 0 + 8 = 8
+03: r1 = r4 * r5;   // top of the loop
+04: r1 = r1 == r2;
+05: IP = r1 + IP;   // if (r4 * r5) == r2, jump to 5+1+1=7, else jump to 5+0+1=6
+06: IP = IP + 1;    // jump to 6+1+1 = 8
+07: r0 = r4 + r0;   // r0 += r4
+08: r5 = r5 + 1;    // r5 += 1
+09: r1 = r5 > r2;
+10: IP = IP + r1;   // if (r5 > r2), jump to 10+1+1=12, else jump to 10+0+1=11
+11: r3 = 2;         // jump to 2+1=3 (top of the loop)
+```
+
+Written as JavaScript:
+```
+do {
+ if ((r4 * r5) == r2) {
+   r0 += r4;
+ }
+ r5 += 1;
+} while (!(r5 > r2));
+```
+
+We don't change r2 or r4 in the loop body, so the only way that (r4 * r5) == r2 can happen is when:
+* r2 % r4 == 0 (otherwise r2 cannot be a multiple of r4)
+* r5 = r2 / r4
+
+The code is equivalent to:
+```
+if (r2 % r4 == 0) {
+  r0 += r4;
+}
+r5 = r2 + 1;
+```
+
+*/
 function evaluateProgram({ipRegister, instructions}: Readonly<Program>, initialState: Readonly<State>): State {
     let ip = initialState.ip;
     let registers = [...initialState.registers] as RegisterState;
+    let t = 0;
+    let enterRegisters: RegisterState | undefined;
     while (ip >= 0 && ip < instructions.length) {
+        if (DEBUG && ip === 2) {
+            // entering loop
+            enterRegisters = registers;
+        }
         registers[ipRegister] = ip;
         registers = evaluateInstruction(registers, instructions[ip]);
+        if (ip === 9 && registers[1] === 0) {
+            // The loop condition (gtrr 5 2 1) returned 0, so we're about to re-enter the loop
+            // Fix it up so we immediately exit the loop instead!
+            if ((registers[4] * (registers[5] - 1) !== registers[2]) && registers[2] % registers[4] === 0) {
+                registers[0] += registers[4];
+            }
+            registers[5] = registers[2] + 1;
+            // Re-evaluate the loop condition
+            registers[ipRegister] = ip;
+            registers = evaluateInstruction(registers, instructions[ip]);
+            if (registers[1] === 0) {
+                throw new Error('Optimization failed!');
+            }
+        }
+        if (DEBUG && ip === 9 && registers[1] === 1) {
+            // exiting loop
+            assert.ok(registers[5] === registers[2] + 1);
+            assert.ok(registers[0] === enterRegisters![0] + (registers[2] % registers[4] === 0 ? registers[4] : 0));
+            enterRegisters = undefined;
+        }
         ip = registers[ipRegister];
         ip++;
+        t++;
     }
     return {ip, registers};
 }
 
 function part1(program: Program) {
     let result = evaluateProgram(program, {ip: 0, registers: [0, 0, 0, 0, 0, 0]});
+    return result.registers[0];
+}
+
+function part2(program: Program) {
+    let result = evaluateProgram(program, {ip: 0, registers: [1, 0, 0, 0, 0, 0]});
     return result.registers[0];
 }
