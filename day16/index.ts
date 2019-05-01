@@ -112,7 +112,7 @@ class RegisterError extends RangeError {
 }
 
 function assertRegister(length: number, index: number): void {
-    if (!(0 <= index && index < 4)) {
+    if (!(0 <= index && index < length)) {
         throw new RegisterError(`Register index out of bounds: ${index} not in [0, ${length}[`);
     }
 }
