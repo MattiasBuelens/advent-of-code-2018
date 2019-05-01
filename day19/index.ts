@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import * as assert from 'assert';
 import {promisify} from 'util';
 
 const DEBUG = true;
@@ -205,7 +204,8 @@ do {
    r0 += r4;
  }
  r5 += 1;
-} while (!(r5 > r2));
+ r1 = (r5 > r2) ? 1 : 0;
+} while (!r1);
 ```
 
 We don't change r2 or r4 in the loop body, so the only way that (r4 * r5) == r2 can happen is when:
@@ -218,44 +218,29 @@ if (r2 % r4 == 0) {
   r0 += r4;
 }
 r5 = r2 + 1;
+r1 = 1;
 ```
 
 */
 function evaluateProgram({ipRegister, instructions}: Readonly<Program>, initialState: Readonly<State>): State {
     let ip = initialState.ip;
     let registers = [...initialState.registers] as RegisterState;
-    let t = 0;
-    let enterRegisters: RegisterState | undefined;
     while (ip >= 0 && ip < instructions.length) {
-        if (DEBUG && ip === 2) {
-            // entering loop
-            enterRegisters = registers;
-        }
-        registers[ipRegister] = ip;
-        registers = evaluateInstruction(registers, instructions[ip]);
-        if (ip === 9 && registers[1] === 0) {
-            // The loop condition (gtrr 5 2 1) returned 0, so we're about to re-enter the loop
-            // Fix it up so we immediately exit the loop instead!
-            if ((registers[4] * (registers[5] - 1) !== registers[2]) && registers[2] % registers[4] === 0) {
+        if (ip === 3) {
+            // Start of loop body
+            // Compute directly
+            if (registers[2] % registers[4] === 0) {
                 registers[0] += registers[4];
             }
             registers[5] = registers[2] + 1;
-            // Re-evaluate the loop condition
-            registers[ipRegister] = ip;
-            registers = evaluateInstruction(registers, instructions[ip]);
-            if (registers[1] === 0) {
-                throw new Error('Optimization failed!');
-            }
+            registers[1] = 1;
+            // Skip loop
+            ip = 12;
         }
-        if (DEBUG && ip === 9 && registers[1] === 1) {
-            // exiting loop
-            assert.ok(registers[5] === registers[2] + 1);
-            assert.ok(registers[0] === enterRegisters![0] + (registers[2] % registers[4] === 0 ? registers[4] : 0));
-            enterRegisters = undefined;
-        }
+        registers[ipRegister] = ip;
+        registers = evaluateInstruction(registers, instructions[ip]);
         ip = registers[ipRegister];
         ip++;
-        t++;
     }
     return {ip, registers};
 }
