@@ -20,6 +20,9 @@ type Area = Acre[][];
 
     const answer1 = part1(area);
     console.log(`Answer to part 1: ${answer1}`);
+
+    const answer2 = part2(area);
+    console.log(`Answer to part 2: ${answer2}`);
 })();
 
 function parse(lines: string[]): Area {
@@ -126,6 +129,42 @@ function getResourceValue(area: Area): number {
 function part1(area: Area): number {
     for (let t = 0; t < 10; t++) {
         area = step(area);
+    }
+    return getResourceValue(area);
+}
+
+function areaToString(area: Area): string {
+    return area.map(line => line.join('')).join('\n');
+}
+
+function part2(initialArea: Area): number {
+    // Map of area to timestamp of first occurrence
+    const areaToTime = new Map<string, number>();
+    // Iterate until we enter the loop
+    let t = 0;
+    let area = initialArea;
+    while (!areaToTime.has(areaToString(area))) {
+        areaToTime.set(areaToString(area), t);
+        area = step(area);
+        t++;
+    }
+    // Found the loop!
+    const loopEnd = t;
+    const loopStart = areaToTime.get(areaToString(area))!;
+    const loopLength = loopEnd - loopStart;
+    if (DEBUG) {
+        console.log(`Area after ${loopEnd} minutes is same as after ${loopStart} minutes`);
+    }
+    // Reduce target timestamp to equivalent timestamp in first loop
+    const target = 1_000_000_000;
+    const reducedTarget = ((target - loopStart) % loopLength) + loopStart;
+    // Iterate until reduced target timestamp
+    area = initialArea;
+    for (let t = 0; t < reducedTarget; t++) {
+        area = step(area);
+    }
+    if (DEBUG) {
+        console.log(`After ${reducedTarget} minutes (same as after ${target} minutes): ${getResourceValue(area)}`);
     }
     return getResourceValue(area);
 }
