@@ -21,8 +21,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^10.12.12",
-    "ts-node": "^7.0.1",
-    "typescript": "^3.2.2"
+    "@types/node": "^10.14.6",
+    "ts-node": "^8.1.0",
+    "typescript": "^3.4.5"
   }
 }
