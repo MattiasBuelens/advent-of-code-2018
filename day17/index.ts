@@ -11,8 +11,11 @@ const readFile = promisify(fs.readFile);
     const lines = input.trim().split('\n');
     const veins = parse(lines);
 
-    const answer1 = part1(veins);
+    const grid = solve(veins);
+    const answer1 = part1(grid);
     console.log(`Answer to part 1: ${answer1}`);
+    const answer2 = part2(grid);
+    console.log(`Answer to part 2: ${answer2}`);
 })();
 
 const enum VeinDirection {
@@ -159,15 +162,19 @@ function isReached(tile: Tile): boolean {
     return tile === Tile.REST || tile === Tile.PASSED;
 }
 
-function countReached(grid: Grid): number {
+function isAtRest(tile: Tile): boolean {
+    return tile === Tile.REST;
+}
+
+function countFiltered(grid: Grid, cb: (tile: Tile) => boolean): number {
     return grid.reduce((count, row) => {
         return count + row.reduce((count, tile) => {
-            return count + (isReached(tile) ? 1 : 0);
+            return count + (cb(tile) ? 1 : 0);
         }, 0);
     }, 0);
 }
 
-function part1(veins: Vein[]) {
+function solve(veins: Vein[]): Grid {
     const {grid, minX} = createGrid(veins);
     // There is also a spring of water near the surface at x=500, y=0.
     const [springX, springY] = [500, 0];
@@ -175,5 +182,13 @@ function part1(veins: Vein[]) {
     if (DEBUG) {
         printGrid(grid);
     }
-    return countReached(grid);
+    return grid;
+}
+
+function part1(grid: Grid) {
+    return countFiltered(grid, isReached);
+}
+
+function part2(grid: Grid) {
+    return countFiltered(grid, isAtRest);
 }
