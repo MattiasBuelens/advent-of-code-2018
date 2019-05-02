@@ -59,32 +59,26 @@ function parse(lines: string[]): Vein[] {
 const enum Tile {
     SAND = '.',
     CLAY = '#',
-    SPRING = '+',
     REST = '~',
     PASSED = '|'
 }
 
 type Grid = Tile[][];
 
-function createGrid(veins: Vein[]): Grid {
+function createGrid(veins: Vein[]): { grid: Grid, minX: number } {
     const horizontalVeins = veins.filter(isHorizontalVein);
     const verticalVeins = veins.filter(isVerticalVein);
-    // There is also a spring of water near the surface at x=500, y=0.
-    const springX = 500;
-    const springY = 0;
     // Any x coordinate is valid.
     // (In the worst case, we need at most one extra column on both sides.)
-    const minX = Math.min(minBy(horizontalVeins, vein => vein.minX), minBy(verticalVeins, vein => vein.x), springX) - 1;
-    const maxX = Math.max(maxBy(horizontalVeins, vein => vein.maxX), maxBy(verticalVeins, vein => vein.x), springX) + 1;
+    const minX = Math.min(minBy(horizontalVeins, vein => vein.minX), minBy(verticalVeins, vein => vein.x)) - 1;
+    const maxX = Math.max(maxBy(horizontalVeins, vein => vein.maxX), maxBy(verticalVeins, vein => vein.x)) + 1;
     // To prevent counting forever, ignore tiles with a y coordinate smaller than the smallest y coordinate
     // in your scan data or larger than the largest one.
-    const minY = Math.min(minBy(verticalVeins, vein => vein.minY), minBy(horizontalVeins, vein => vein.y), springY);
-    const maxY = Math.max(maxBy(verticalVeins, vein => vein.maxY), maxBy(horizontalVeins, vein => vein.y), springY);
+    const minY = Math.min(minBy(verticalVeins, vein => vein.minY), minBy(horizontalVeins, vein => vein.y));
+    const maxY = Math.max(maxBy(verticalVeins, vein => vein.maxY), maxBy(horizontalVeins, vein => vein.y));
     const width = maxX - minX + 1;
     const height = maxY - minY + 1;
     const grid: Tile[][] = Array.from(new Array(height), () => new Array(width).fill(Tile.SAND));
-    // Water spring
-    grid[springY - minY][springX - minX] = Tile.SPRING;
     // Horizontal veins of clay
     for (const vein of horizontalVeins) {
         for (let x = vein.minX; x <= vein.maxX; x++) {
@@ -97,7 +91,7 @@ function createGrid(veins: Vein[]): Grid {
             grid[y - minY][vein.x - minX] = Tile.CLAY;
         }
     }
-    return grid;
+    return {grid, minX};
 }
 
 function printGrid(grid: Grid) {
@@ -174,10 +168,10 @@ function countReached(grid: Grid): number {
 }
 
 function part1(veins: Vein[]) {
-    const grid = createGrid(veins);
-    const springY = 0;
-    const springX = grid[springY].findIndex(x => x === Tile.SPRING);
-    flow(grid, springX, springY + 1);
+    const {grid, minX} = createGrid(veins);
+    // There is also a spring of water near the surface at x=500, y=0.
+    const [springX, springY] = [500, 0];
+    flow(grid, springX - minX, springY);
     if (DEBUG) {
         printGrid(grid);
     }
