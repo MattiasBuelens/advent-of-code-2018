@@ -82,3 +82,5 @@ function part2(serial: number) {
     console.log(`Square with size ${bestN} at ${bestX},${bestY} has ${bestPower} power`);
     console.log(`Answer to part 2: ${bestX},${bestY},${bestN}`);
 }
+
+export {};

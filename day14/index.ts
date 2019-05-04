@@ -80,3 +80,5 @@ function printState(recipes: number[], current: number[]) {
     }
     console.log(parts.join(' '));
 }
+
+export {};
