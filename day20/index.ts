@@ -28,6 +28,7 @@ interface Position {
 interface Room {
     pos: Position;
     doors: { [D in Direction]?: Room };
+    distance: number;
 }
 
 type RoomMap = Map<number, Map<number, Room>>;
@@ -78,7 +79,8 @@ function createRoom(map: RoomMap, pos: Position): Room {
             [Direction.EAST]: undefined,
             [Direction.SOUTH]: undefined,
             [Direction.WEST]: undefined
-        }
+        },
+        distance: -1
     };
     if (!map.has(pos.y)) {
         map.set(pos.y, new Map());
@@ -222,6 +224,112 @@ function printMap(map: RoomMap) {
     }
 }
 
+function isDefined<T>(x: T | undefined): x is T {
+    return x !== undefined;
+}
+
+function getAdjacentRooms(room: Room): Room[] {
+    return DIRECTIONS.map(dir => room.doors[dir]).filter(isDefined);
+}
+
+function compareByDistance(left: Room, right: Room): number {
+    return (left.distance - right.distance);
+}
+
+function comparePositions(left: Position, right: Position): number {
+    return (left.y - right.y) || (left.x - right.x);
+}
+
+function compareRooms(left: Room, right: Room): number {
+    return compareByDistance(left, right) || comparePositions(left.pos, right.pos);
+}
+
+function binarySearch<T>(array: T[], key: T, compare: (left: T, right: T) => number): number {
+    let low = 0;
+    let high = array.length - 1;
+    while (low <= high) {
+        let mid = (low + high) >>> 1;
+        let cmp = compare(array[mid], key);
+        if (cmp < 0) {
+            low = mid + 1;
+        } else if (cmp > 0) {
+            high = mid - 1;
+        } else {
+            return mid; // key found
+        }
+    }
+    return -(low + 1);  // key not found
+}
+
+function findDistances(map: RoomMap, startRoom: Room) {
+    // https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Algorithm
+    // 1. Mark all nodes unvisited.
+    //    Create a set of all the unvisited nodes called the unvisited set.
+    // 2. Assign to every node a tentative distance value:
+    //    set it to zero for our initial node and to infinity for all other nodes.
+    //    Set the initial node as current.
+    const unvisited: Room[] = [];
+    const visited: Set<Room> = new Set();
+    for (let [y, row] of map) {
+        for (let [x, room] of row) {
+            room.distance = Number.MAX_SAFE_INTEGER;
+            unvisited.push(room);
+        }
+    }
+    startRoom.distance = 0;
+    unvisited.sort(compareRooms);
+
+    // 5. If [...] the smallest tentative distance among the nodes in the unvisited set is infinity
+    //    (when planning a complete traversal; occurs when there is no connection between the initial node
+    //    and remaining unvisited nodes), then stop. The algorithm has finished.
+    while (unvisited.length > 0 && unvisited[0].distance < Number.MAX_SAFE_INTEGER) {
+        // 6. Otherwise, select the unvisited node that is marked with the smallest tentative distance,
+        //    set it as the new "current node", and go back to step 3.
+        let current = unvisited[0];
+
+        // 3. For the current node, consider all of its unvisited neighbors and calculate their tentative
+        //    distances through the current node. Compare the newly calculated tentative distance to the
+        //    current assigned value and assign the smaller one.
+        for (let neighbour of getAdjacentRooms(current)) {
+            if (visited.has(neighbour)) {
+                continue;
+            }
+            let costThroughCurrent = current.distance + 1;
+            if (costThroughCurrent < neighbour.distance) {
+                // Found better path through current
+                let oldIndex = binarySearch(unvisited, neighbour, compareRooms);
+                if (DEBUG) {
+                    assert.strictEqual(unvisited[oldIndex], neighbour);
+                }
+                unvisited.splice(oldIndex, 1);
+
+                neighbour.distance = costThroughCurrent;
+
+                let newIndex = -(binarySearch(unvisited, neighbour, compareRooms) + 1);
+                unvisited.splice(newIndex, 0, neighbour);
+            }
+        }
+
+        // 4. When we are done considering all of the unvisited neighbors of the current node,
+        //    mark the current node as visited and remove it from the unvisited set.
+        //    A visited node will never be checked again.
+        visited.add(current);
+        unvisited.shift();
+    }
+}
+
+function getFurthestRoom(map: RoomMap): Room {
+    let furthestRoom: Room = map.get(0)!.get(0)!;
+    for (let [y, row] of map) {
+        for (let [x, room] of row) {
+            if (room.distance > furthestRoom.distance) {
+                furthestRoom = room;
+            }
+        }
+    }
+    return furthestRoom;
+}
+
 function part1(regex: string) {
     const map: RoomMap = new Map();
     const startRoom = createRoom(map, {x: 0, y: 0});
@@ -229,4 +337,11 @@ function part1(regex: string) {
     if (DEBUG) {
         printMap(map);
     }
+
+    findDistances(map, startRoom);
+    const furthestRoom = getFurthestRoom(map);
+    if (DEBUG) {
+        console.log(`Furthest room is at (${furthestRoom.pos.x},${furthestRoom.pos.y}) with distance ${furthestRoom.distance}`);
+    }
+    return furthestRoom.distance;
 }
