@@ -37,8 +37,11 @@ type RoomMap = Map<number, Map<number, Room>>;
     const input = await readFile('./input', {encoding: 'utf8'});
     const regex = input.trim();
 
-    const answer1 = part1(regex);
+    const map = solve(regex);
+    const answer1 = part1(map);
     console.log(`Answer to part 1: ${answer1}`);
+    const answer2 = part2(map);
+    console.log(`Answer to part 2: ${answer2}`);
 })();
 
 function opposite(dir: Direction): Direction {
@@ -328,18 +331,38 @@ function getFurthestRoom(map: RoomMap): Room {
     return furthestRoom;
 }
 
-function part1(regex: string) {
+function solve(regex: string): RoomMap {
     const map: RoomMap = new Map();
     const startRoom = createRoom(map, {x: 0, y: 0});
     parse(map, regex, 0, new Set<Room>([startRoom]));
     if (DEBUG) {
         printMap(map);
     }
-
     findDistances(map, startRoom);
+    return map;
+}
+
+function part1(map: RoomMap) {
     const furthestRoom = getFurthestRoom(map);
     if (DEBUG) {
         console.log(`Furthest room is at (${furthestRoom.pos.x},${furthestRoom.pos.y}) with distance ${furthestRoom.distance}`);
     }
     return furthestRoom.distance;
+}
+
+function getRoomsFurtherThan(map: RoomMap, threshold: number): Room[] {
+    let farRooms: Room[] = [];
+    for (let [y, row] of map) {
+        for (let [x, room] of row) {
+            if (room.distance >= threshold) {
+                farRooms.push(room);
+            }
+        }
+    }
+    return farRooms;
+}
+
+function part2(map: RoomMap) {
+    const roomsFurtherThan1000 = getRoomsFurtherThan(map, 1000);
+    return roomsFurtherThan1000.length;
 }
