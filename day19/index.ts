@@ -151,7 +151,7 @@ function evaluateInstruction(registers: Readonly<RegisterState>, {op, a, b, c}: 
             newRegisters[c] = (a === registers[b]) ? 1 : 0;
             break;
         case Operation.EQUAL_REGISTER_IMMEDIATE:
-            assertRegister(registers.length, b);
+            assertRegister(registers.length, a);
             newRegisters[c] = (registers[a] === b) ? 1 : 0;
             break;
         case Operation.EQUAL_REGISTER_REGISTER:
