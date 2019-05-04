@@ -47,6 +47,9 @@ interface Program {
     const input = await readFile('./input', {encoding: 'utf8'});
     const lines = input.trim().split('\n');
     const program = parse(lines);
+
+    const answer1 = part1(program);
+    console.log(`Answer to part 1: ${answer1}`);
 })();
 
 function parse(lines: string[]): Program {
@@ -167,4 +170,25 @@ function evaluateProgram({ipRegister, instructions}: Readonly<Program>, initialS
         ip++;
     }
     return {ip, registers};
+}
+
+function part1(program: Program) {
+    // At IP = 28, the program checks whether the computed R1 matches the input R0 (eqrr 1 0 5).
+    // If it does, it exits the program, otherwise it jumps back to the top of the loop to compute a new R1.
+    // We replace that instruction with a jump to the end, so we can dump the first value of R1.
+    const index = 28;
+    const modifiedProgram: Program = {
+        ipRegister: program.ipRegister,
+        instructions: [
+            ...program.instructions.slice(0, index),
+            {op: Operation.SET_IMMEDIATE, a: program.instructions.length, b: 0, c: program.ipRegister},
+            ...program.instructions.slice(index + 1)
+        ]
+    };
+    const result = evaluateProgram(modifiedProgram, {ip: 0, registers: [0, 0, 0, 0, 0, 0]});
+
+    // If we were run the original program with R0 set to this found value for R1, the check would succeed
+    // on the very first iteration. Therefore, this is the value that will cause the program to halt
+    // after executing the fewest instructions.
+    return result.registers[1];
 }
