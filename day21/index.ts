@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as assert from 'assert';
 import {promisify} from 'util';
 
 const DEBUG = true;
@@ -50,6 +51,9 @@ interface Program {
 
     const answer1 = part1(program);
     console.log(`Answer to part 1: ${answer1}`);
+
+    const answer2 = part2(program);
+    console.log(`Answer to part 2: ${answer2}`);
 })();
 
 function parse(lines: string[]): Program {
@@ -191,4 +195,53 @@ function part1(program: Program) {
     // on the very first iteration. Therefore, this is the value that will cause the program to halt
     // after executing the fewest instructions.
     return result.registers[1];
+}
+
+function part2({ipRegister, instructions}: Readonly<Program>): number {
+    let ip = 0;
+    let registers = [0, 0, 0, 0, 0, 0] as RegisterState;
+    const values = new Set<number>();
+    while (ip >= 0 && ip < instructions.length) {
+        if (ip === 28) {
+            if (values.has(registers[1])) {
+                // Found a loop!
+                // Return the last value
+                return [...values][values.size - 1];
+            } else {
+                values.add(registers[1]);
+            }
+        }
+        registers[ipRegister] = ip;
+        registers = evaluateInstruction(registers, instructions[ip]);
+        if (ip === 17) {
+            /*
+              Lines 17 to 25 decompile to:
+              ```
+              let r5 = 0;
+              while (((r5 + 1) * 256) <= r2) {
+                r5++;
+              }
+              ```
+
+              The loop stops when:
+              ```
+              ((r5 + 1) * 256) > r2
+              r5 + 1 > floor(r2 / 256)
+              r5 > floor(r2 / 256) - 1
+              r5 >= floor(r2 / 256)
+              ```
+
+              Optimize the loop by immediately setting R5 to the right-hand side.
+            */
+            registers[5] = Math.floor(registers[2] / 256);
+        }
+        if (ip === 23) {
+            // When the above optimization is turned off,
+            // this sanity check should succeed when the loop exits at line 23.
+            assert.strictEqual(registers[5], Math.floor(registers[2] / 256));
+        }
+        ip = registers[ipRegister];
+        ip++;
+    }
+    return -1;
 }
