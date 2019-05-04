@@ -205,20 +205,18 @@ function printMap(map: RoomMap) {
     const mapArray = mapToArray(map);
     console.log('##'.repeat(mapArray[0].length) + '#');
     for (let row of mapArray) {
-        let line1: string[] = [];
-        let line2: string[] = [];
+        let line1: string[] = ['#'];
+        let line2: string[] = ['#'];
         for (let room of row) {
             line1.push(
-                room.doors[Direction.WEST] ? '|' : '#',
-                (room.pos.x === 0 && room.pos.y === 0) ? 'X' : '.'
+                (room.pos.x === 0 && room.pos.y === 0) ? 'X' : '.',
+                room.doors[Direction.EAST] ? '|' : '#'
             );
             line2.push(
-                '#',
-                room.doors[Direction.SOUTH] ? '-' : '#'
+                room.doors[Direction.SOUTH] ? '-' : '#',
+                '#'
             );
         }
-        line1.push('#');
-        line2.push('#');
         console.log(line1.join(''));
         console.log(line2.join(''));
     }
