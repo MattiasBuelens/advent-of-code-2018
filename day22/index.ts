@@ -31,17 +31,14 @@ function parse(lines: string[]): { depth: number, target: Position } {
     return {depth, target: {x, y}};
 }
 
-function create2DArray<T>(width: number, height: number, value: T): T[][] {
-    return Array.from(new Array(height), () => new Array(width).fill(value));
-}
-
-function part1(depth: number, target: Position): number {
-    const width = target.x + 1;
-    const height = target.y + 1;
-    const erosionLevels: number[][] = create2DArray(width, height, 0);
-    let riskLevel: number = 0;
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
+function computeErosionLevels(erosionLevels: number[][], depth: number, target: Position, pos: Position) {
+    // Compute extra rows
+    for (let y = erosionLevels.length; y <= pos.y; y++) {
+        erosionLevels[y] = [];
+    }
+    // Compute extra columns
+    for (let y = 0; y <= pos.y; y++) {
+        for (let x = erosionLevels[y].length; x <= pos.x; x++) {
             let geologicIndex: number;
             if (y === 0 && x === 0) {
                 // The region at 0,0 (the mouth of the cave) has a geologic index of 0.
@@ -63,6 +60,19 @@ function part1(depth: number, target: Position): number {
             // A region's erosion level is its geologic index plus the cave system's depth, all modulo 20183.
             const erosionLevel = (geologicIndex + depth) % 20183;
             erosionLevels[y][x] = erosionLevel;
+        }
+    }
+}
+
+function part1(depth: number, target: Position): number {
+    const width = target.x + 1;
+    const height = target.y + 1;
+    const erosionLevels: number[][] = [];
+    computeErosionLevels(erosionLevels, depth, target, target);
+    let riskLevel: number = 0;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const erosionLevel = erosionLevels[y][x];
             // If the erosion level modulo 3 is 0, the region's type is rocky.
             // If the erosion level modulo 3 is 1, the region's type is wet.
             // If the erosion level modulo 3 is 2, the region's type is narrow.
