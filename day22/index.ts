@@ -106,9 +106,13 @@ interface Node {
     f: number;
 }
 
+function getManhattanDistance(left: Position, right: Position): number {
+    return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
+}
+
 function getHScore(left: Position, right: Position): number {
     // Heuristic: Manhattan distance
-    return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
+    return getManhattanDistance(left, right);
 }
 
 function comparePositions(left: Position, right: Position): number {
@@ -123,8 +127,14 @@ function compareFScore(left: Node, right: Node): number {
     return left.f - right.f;
 }
 
+function compareTools(left: Tool, right: Tool): number {
+    return left - right;
+}
+
 function compareNodes(left: Node, right: Node): number {
-    return compareFScore(left, right) || comparePositions(left.pos, right.pos);
+    return compareFScore(left, right)
+        || comparePositions(left.pos, right.pos)
+        || compareTools(left.tool, right.tool);
 }
 
 function getAdjacentPositions({x, y}: Position): Position[] {
@@ -209,8 +219,8 @@ function findBestPath(erosionLevels: number[][], depth: number, target: Position
     // The set of currently discovered nodes that are not evaluated yet.
     // Note: sorted by F score.
     const openSet = new Array<Node>();
-    // Map of position to node.
-    const nodeMap = new Map<number, Map<number, Node>>();
+    // Map of [position, tool] to node.
+    const nodeMap = new Map<number, Map<number, Map<Tool, Node>>>();
 
     // Initially, only the start node is known.
     computeErosionLevels(erosionLevels, depth, target, startPos);
@@ -219,44 +229,33 @@ function findBestPath(erosionLevels: number[][], depth: number, target: Position
     while (openSet.length > 0) {
         // Let current be the node in openSet having the lowest F score value
         let current = openSet[0];
-        if (positionEquals(current.pos, target)) {
+        // Finally, once you reach the target, you need the torch equipped before you can find him in the dark.
+        if (positionEquals(current.pos, target) && current.tool === Tool.TORCH) {
             return current;
         }
 
         openSet.shift();
         closedSet.add(current);
 
+        if (positionEquals(current.pos, target)) {
+            // We're at the target, but we haven't equipped our torch yet.
+            // Add a node to switch to using the torch.
+            if (DEBUG) {
+                assert.ok(current.tool !== Tool.TORCH);
+                assert.ok(getRegionTypeAtPosition(current.pos) === RegionType.ROCKY);
+                assert.ok(getNode(current.pos, Tool.TORCH) === undefined);
+            }
+            addOrUpdateNeighbour(current, current.pos, Tool.TORCH);
+            continue;
+        }
+
         const currentRegion = getRegionTypeAtPosition(current.pos);
         for (let neighbourPos of getAdjacentPositions(current.pos)) {
-            let neighbour = getNode(neighbourPos);
-            if (neighbour && closedSet.has(neighbour)) {
-                // Ignore the neighbor which is already evaluated.
-                continue;
-            }
             // Expand up to neighbour position
             computeErosionLevels(erosionLevels, depth, target, neighbourPos);
             const neighbourRegion = getRegionTypeAtPosition(neighbourPos);
             const newTool = getNextTool(current.tool, currentRegion, neighbourRegion);
-            const newG = current.g
-                // Moving to an adjacent region takes one minute.
-                + 1
-                // Switching to using the climbing gear, torch, or neither always takes seven minutes.
-                + (newTool !== current.tool ? 7 : 0);
-            const newF = newG + getHScore(neighbourPos, target);
-            if (!neighbour) {
-                // Discover a new node
-                neighbour = {
-                    pos: neighbourPos,
-                    tool: newTool,
-                    prev: current,
-                    g: newG,
-                    f: newF
-                };
-                addNode(neighbour);
-            } else if (newG < neighbour.g) {
-                // Found better path through current
-                updateNode(neighbour, current, newTool, newG, newF);
-            }
+            addOrUpdateNeighbour(current, neighbourPos, newTool);
         }
     }
 
@@ -266,15 +265,54 @@ function findBestPath(erosionLevels: number[][], depth: number, target: Position
         return getRegionType(erosionLevels[y][x]);
     }
 
-    function getNode(pos: Position): Node | undefined {
-        return nodeMap.has(pos.y) ? nodeMap.get(pos.y)!.get(pos.x) : undefined;
+    function addOrUpdateNeighbour(current: Node, neighbourPos: Position, newTool: Tool) {
+        let neighbour = getNode(neighbourPos, newTool);
+        if (neighbour && closedSet.has(neighbour)) {
+            // Ignore the neighbor which is already evaluated.
+            return;
+        }
+        const newG = current.g
+            // Moving to an adjacent region takes one minute.
+            + getManhattanDistance(current.pos, neighbourPos)
+            // Switching to using the climbing gear, torch, or neither always takes seven minutes.
+            + (newTool !== current.tool ? 7 : 0);
+        const newF = newG + getHScore(neighbourPos, target);
+        if (!neighbour) {
+            // Discover a new node
+            neighbour = {
+                pos: neighbourPos,
+                tool: newTool,
+                prev: current,
+                g: newG,
+                f: newF
+            };
+            addNode(neighbour);
+        } else if (newG < neighbour.g) {
+            // Found better path through current
+            updateNode(neighbour, current, newTool, newG, newF);
+        }
+    }
+
+    function getNode(pos: Position, tool: Tool): Node | undefined {
+        if (!nodeMap.has(pos.y)) {
+            return undefined;
+        }
+        const row = nodeMap.get(pos.y)!;
+        if (!row.has(pos.x)) {
+            return undefined;
+        }
+        return row.get(pos.x)!.get(tool);
     }
 
     function addNode(node: Node) {
         if (!nodeMap.has(node.pos.y)) {
-            nodeMap.set(node.pos.y, new Map<number, Node>());
+            nodeMap.set(node.pos.y, new Map<number, Map<Tool, Node>>());
         }
-        nodeMap.get(node.pos.y)!.set(node.pos.x, node);
+        const row = nodeMap.get(node.pos.y)!;
+        if (!row.has(node.pos.x)) {
+            row.set(node.pos.x, new Map<Tool, Node>());
+        }
+        row.get(node.pos.x)!.set(node.tool, node);
 
         const index = binarySearch(openSet, node, compareNodes);
         if (DEBUG) {
@@ -308,13 +346,5 @@ function findBestPath(erosionLevels: number[][], depth: number, target: Position
 function part2(depth: number, target: Position): number {
     const erosionLevels: number[][] = [];
     let node = findBestPath(erosionLevels, depth, target);
-    // Finally, once you reach the target, you need the torch equipped before you can find him in the dark.
-    if (node.tool !== Tool.TORCH) {
-        node = {
-            ...node,
-            tool: Tool.TORCH,
-            g: node.g + 7
-        };
-    }
     return node.g;
 }
