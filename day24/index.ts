@@ -28,6 +28,9 @@ interface Group {
 
     const answer1 = part1(groups);
     console.log(`Answer to part 1: ${answer1}`);
+
+    const answer2 = part2(groups);
+    console.log(`Answer to part 2: ${answer2}`);
 })();
 
 function parse(lines: string[]): Group[] {
@@ -122,7 +125,10 @@ function getDamage(attacker: Group, defender: Group): number {
     return damage;
 }
 
-function fight(groups: Group[]): Group[] {
+class ImmuneSystemLostError extends Error {
+}
+
+function fight(groups: Group[], stopIfImmuneSystemLoses: boolean): Group[] {
     groups = groups.map(cloneGroup);
 
     // Target selection
@@ -131,6 +137,7 @@ function fight(groups: Group[]): Group[] {
     const groupsByTargetSelectionOrder = [...groups].sort(compareByTargetSelectionOrder).reverse();
     const targetSelection = new Map<Group, Group>();
     const defenders = new Set(groups);
+    let isImmuneSystemAttacking = false;
     for (const attacker of groupsByTargetSelectionOrder) {
         // During the target selection phase, each group attempts to choose one target.
         const enemies = [...defenders].filter(group => group.army !== attacker.army);
@@ -156,6 +163,15 @@ function fight(groups: Group[]): Group[] {
         targetSelection.set(attacker, enemy);
         // Defending groups can only be chosen as a target by one attacking group.
         defenders.delete(enemy);
+        if (attacker.army === Army.IMMUNE) {
+            isImmuneSystemAttacking = true;
+        }
+    }
+
+    // Optimization: If the immune system cannot do any damage to the infection, then it is doomed to lose.
+    // This happens when the infection is immune to all remaining units of the immune system.
+    if (stopIfImmuneSystemLoses && !isImmuneSystemAttacking) {
+        throw new ImmuneSystemLostError();
     }
 
     // Attacking
@@ -185,15 +201,66 @@ function bothArmiesStillContainUnits(groups: Group[]): boolean {
         && groups.some(group => group.army === Army.INFECTION);
 }
 
-function part1(groups: Group[]) {
+function fightToTheDeath(groups: Group[], stopIfImmuneSystemLoses: boolean = false): Group[] {
     do {
-        groups = fight(groups);
+        groups = fight(groups, stopIfImmuneSystemLoses);
         // After the fight is over, if both armies still contain units, a new fight begins;
         // combat only ends once one army has lost all of its units.
     } while (bothArmiesStillContainUnits(groups));
+    return groups;
+}
+
+function part1(groups: Group[]): number {
+    groups = fightToTheDeath(groups);
     const units = groups.reduce((total, group) => total + group.units, 0);
     if (DEBUG) {
         console.log(groups);
     }
+    return units;
+}
+
+function boostImmuneSystem(groups: Group[], boost: number): Group[] {
+    return groups.map(cloneGroup).map(group => {
+        if (group.army === Army.IMMUNE) {
+            group.attackDamage += boost;
+        }
+        return group;
+    });
+}
+
+function getWinner(groups: Group[]): Army {
+    try {
+        groups = fightToTheDeath(groups, true);
+        return groups[0].army;
+    } catch (e) {
+        if (e instanceof ImmuneSystemLostError) {
+            return Army.INFECTION;
+        }
+        throw e;
+    }
+}
+
+function part2(groups: Group[]): number {
+    let minBoost = 0;
+    let maxBoost = 100; // Found through trial and error. Might be higher for different inputs.
+
+    let boost: number;
+    let boostedGroups: Group[];
+    do {
+        boost = Math.floor((minBoost + maxBoost) / 2);
+        boostedGroups = boostImmuneSystem(groups, boost);
+        if (getWinner(boostedGroups) === Army.IMMUNE) {
+            maxBoost = boost - 1;
+        } else {
+            minBoost = boost + 1;
+        }
+    } while (minBoost <= maxBoost);
+
+    const winningArmy = fightToTheDeath(boostedGroups);
+    const units = winningArmy.reduce((total, group) => total + group.units, 0);
+    if (DEBUG) {
+        console.log({boost, winningArmy, units});
+    }
+
     return units;
 }
