@@ -1,8 +1,7 @@
 import * as fs from 'fs';
 import * as assert from 'assert';
 import {promisify} from 'util';
-
-const DEBUG = true;
+import {DEBUG} from '../debug';
 
 const readFile = promisify(fs.readFile);
 

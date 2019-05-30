@@ -1,8 +1,6 @@
 import * as fs from 'fs';
 import {promisify} from 'util';
 
-const DEBUG = true;
-
 const readFile = promisify(fs.readFile);
 
 const enum Operation {
