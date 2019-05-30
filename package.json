@@ -28,12 +28,14 @@
     "day22": "cd day22 && ts-node index",
     "day23": "cd day23 && ts-node index",
     "day24": "cd day24 && ts-node index",
-    "day25": "cd day25 && ts-node index"
+    "day25": "cd day25 && ts-node index",
+    "all": "npm-run-all day*"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/node": "^10.14.6",
+    "npm-run-all": "^4.1.5",
     "ts-node": "^8.1.0",
     "typescript": "^3.4.5"
   }
