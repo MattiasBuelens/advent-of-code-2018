@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import {promisify} from 'util';
+import {DEBUG} from '../debug';
 
 const readFile = promisify(fs.readFile);
 
@@ -15,7 +16,9 @@ function part1(polymer: string) {
     const units = polymer.split('');
     let reacted = react(units);
 
-    console.log(`Fully reacted polymer: ${reacted.join('')}`);
+    if (DEBUG) {
+        console.log(`Fully reacted polymer: ${reacted.join('')}`);
+    }
     console.log(`Answer to part 1: ${reacted.length}`);
 }
 
@@ -34,8 +37,10 @@ function part2(polymer: string) {
         }
     }
 
-    console.log(`Best unit to remove: ${bestUnitToRemove}`);
-    console.log(`Reacted polymer after best unit is removed: ${bestReacted.join('')}`);
+    if (DEBUG) {
+        console.log(`Best unit to remove: ${bestUnitToRemove}`);
+        console.log(`Reacted polymer after best unit is removed: ${bestReacted.join('')}`);
+    }
     console.log(`Answer to part 2: ${bestReacted.length}`);
 }
 

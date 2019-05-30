@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import {promisify} from 'util';
+import {DEBUG} from '../debug';
 
 const readFile = promisify(fs.readFile);
 
@@ -8,7 +9,7 @@ const readFile = promisify(fs.readFile);
     const lines = input.trim().split('\n');
 
     console.log(`part1: ${part1(lines)}`);
-    console.log(`part2: ${JSON.stringify(part2(lines))}`);
+    console.log(`part2: ${part2(lines)}`);
 })();
 
 function getLetterCounts(word: string): Map<string, number> {
@@ -34,7 +35,7 @@ function part1(ids: string[]): number {
     return numberOfIdsContainingALetterTwice * numberOfIdsContainingALetterThrice;
 }
 
-function part2(ids: string[]): { id1: string, id2: string, common: string } {
+function part2(ids: string[]): string {
     for (let i = 0; i < ids.length; i++) {
         const id1 = ids[i];
         for (let j = i + 1; j < ids.length; j++) {
@@ -49,7 +50,10 @@ function part2(ids: string[]): { id1: string, id2: string, common: string } {
                 for (let k = 0; k < id1.length; k++) {
                     if (id1[k] !== id2[k]) {
                         const common = id1.slice(0, k) + id1.slice(k + 1);
-                        return {id1, id2, common};
+                        if (DEBUG) {
+                            console.log({id1, id2, common});
+                        }
+                        return common;
                     }
                 }
             }
