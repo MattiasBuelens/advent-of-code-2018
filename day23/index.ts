@@ -114,12 +114,14 @@ function part2(nanobots: Nanobot[]): number {
     // 4. Repeat until radius is less than one.
     // 5. We found a sphere with |radius| = 1 that is in range of the most bots,
     //    so this sphere's center is the point of most overlap.
-    let bestPos: Position = startPos;
     let bounds = gridBounds;
     let radius = largestDiagonal;
-    while (radius > 0) {
-        let bestInRange: number = 0;
-        let bestDistance: number = Number.MAX_SAFE_INTEGER;
+    let bestPos: Position = startPos;
+    let bestInRange: number;
+    let bestDistance: number;
+    do {
+        bestInRange = 0;
+        bestDistance = Number.MAX_SAFE_INTEGER;
         for (let x = bounds.minX; x <= bounds.maxX; x += radius) {
             for (let y = bounds.minY; y <= bounds.maxY; y += radius) {
                 for (let z = bounds.minZ; z <= bounds.maxZ; z += radius) {
@@ -147,12 +149,8 @@ function part2(nanobots: Nanobot[]): number {
             maxZ: bestPos.z + radius,
         };
         radius = Math.floor(radius / 2);
-    }
+    } while (radius > 0);
 
-    let bestInRange = nanobots.filter((bot) => {
-        return getManhattanDistance(bestPos, bot.pos) <= bot.radius;
-    }).length;
-    let bestDistance = getManhattanDistance(startPos, bestPos);
     if (DEBUG) {
         console.log({bestPos, bestInRange, bestDistance});
     }
